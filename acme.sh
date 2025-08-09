@@ -34,7 +34,7 @@ print_error() {
 show_banner() {
     echo -e "${BLUE}"
     echo "=========================================="
-    echo "      acme.sh SSL 证书一键申请脚本"
+    echo "       acme.sh SSL 证书一键申请脚本"
     echo "=========================================="
     echo -e "${NC}"
 }
@@ -363,7 +363,7 @@ setup_auto_upgrade() {
 show_completion_info() {
     echo ""
     echo -e "${GREEN}=========================================="
-    echo "      🎉 SSL 证书申请完成！"
+    echo "         🎉 SSL 证书申请完成！"
     echo "==========================================${NC}"
     echo ""
     print_success "证书文件位置："
@@ -385,8 +385,9 @@ show_completion_info() {
     echo "  }"
     echo ""
     echo -e "${BLUE}=========================================="
-    echo "           脚本执行完成"
+    echo "            脚本执行完成"
     echo "==========================================${NC}"
+    echo ""
 }
 
 # 清理函数
