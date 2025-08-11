@@ -2,7 +2,7 @@
 # ===============================================
 # 脚本名称：acme_cert_setup.sh
 # 脚本功能：使用 acme.sh 自动化申请 SSL 证书
-# 版本：2.0
+# 版本：3.0
 # 支持：Cloudflare DNS 验证
 # ===============================================
 
@@ -35,39 +35,124 @@ show_banner() {
     echo -e "${BLUE}=========================================="
     echo "         acme.sh SSL 证书一键申请脚本"
     echo "==========================================${NC}"
+    echo ""
 }
 
-# (其余代码省略，与你提供的相同)
+# 检查 Nginx 是否安装
+check_nginx() {
+    print_info "正在检查 Nginx 是否已安装..."
+    if ! command -v nginx &> /dev/null; then
+        print_error "未找到 Nginx。本脚本依赖 Nginx，请先安装。"
+        print_error "例如：apt-get update && apt-get install nginx"
+        exit 1
+    fi
+    print_success "Nginx 已安装。"
+}
 
-# 显示完成信息
+# 获取用户输入
+get_user_input() {
+    echo -e "${YELLOW}请提供以下信息以开始证书申请：${NC}"
+    read -p "请输入您的域名 (例如: example.com): " DOMAIN
+    if [ -z "$DOMAIN" ]; then
+        print_error "域名不能为空！"
+        exit 1
+    fi
+
+    read -p "请输入您的 Cloudflare 注册邮箱: " EMAIL
+    if [ -z "$EMAIL" ]; then
+        print_error "Cloudflare 邮箱不能为空！"
+        exit 1
+    fi
+
+    read -p "请输入您的 Cloudflare API Token: " CF_Token
+    if [ -z "$CF_Token" ]; then
+        print_error "Cloudflare API Token 不能为空！"
+        exit 1
+    fi
+
+    read -p "请输入您的 Cloudflare Account ID: " CF_Account_ID
+    if [ -z "$CF_Account_ID" ]; then
+        print_error "Cloudflare Account ID 不能为空！"
+        exit 1
+    fi
+    echo ""
+}
+
+# 显示完成信息 (已精简)
 show_completion_info() {
-    echo ""
-    echo -e "${GREEN}=========================================="
-    echo "            🎉 SSL 证书申请完成！"
-    echo "==========================================${NC}"
-    echo ""
     print_success "证书文件位置："
     echo "  • 私钥文件: /etc/nginx/ssl/$DOMAIN.key"
     echo "  • 证书文件: /etc/nginx/ssl/$DOMAIN.pem"
     echo ""
-    print_info "下一步操作："
-    echo "  1. 配置 Nginx 以使用 SSL 证书"
-    echo "  2. 测试网站 HTTPS 访问"
-    echo "  3. 证书将自动续期，无需手动操作"
-    echo ""
-    print_info "Nginx SSL 配置示例："
-    echo "  server {"
-    echo "    listen 443 ssl;"
-    echo "    server_name $DOMAIN;"
-    echo "    ssl_certificate /etc/nginx/ssl/$DOMAIN.pem;"
-    echo "    ssl_certificate_key /etc/nginx/ssl/$DOMAIN.key;"
-    echo "    # ... 其他配置"
-    echo "  }"
-    echo ""
-    echo -e "${BLUE}=========================================="
-    echo "            脚本执行完成"
-    echo "==========================================${NC}"
-    echo ""
 }
 
-# (主函数及其他代码省略，与你提供的相同)
+# 脚本主执行逻辑
+main() {
+    show_banner
+    check_nginx
+    get_user_input
+
+    # 安装 acme.sh
+    if [ ! -d "$HOME/.acme.sh" ]; then
+        print_info "未检测到 acme.sh，正在为你安装..."
+        curl https://get.acme.sh | sh -s email="$EMAIL"
+        if [ $? -ne 0 ]; then
+            print_error "acme.sh 安装失败，请手动尝试。"
+            exit 1
+        fi
+        print_success "acme.sh 安装完成！"
+    else
+        print_info "acme.sh 已安装，跳过安装步骤。"
+    fi
+    # 让当前 shell 进程识别 acme.sh 命令
+    export PATH="$HOME/.acme.sh:$PATH"
+
+    # 导出 Cloudflare 环境变量，供 acme.sh 使用
+    export CF_Token="$CF_Token"
+    export CF_Account_ID="$CF_Account_ID"
+    
+    # 申请证书
+    print_info "正在为域名 $DOMAIN 申请 SSL 证书..."
+    ~/.acme.sh/acme.sh --issue --dns dns_cf -d "$DOMAIN"
+    if [ $? -ne 0 ]; then
+        print_error "证书申请失败，请检查您的 Cloudflare 配置。"
+        exit 1
+    fi
+    print_success "证书申请成功！"
+
+    # 新建文件夹，并赋予权限
+    CERT_DIR="/etc/nginx/ssl"
+    if [ ! -d "$CERT_DIR" ]; then
+        print_info "正在创建证书存储目录 $CERT_DIR"
+        mkdir -p "$CERT_DIR"
+    fi
+    chown root:root "$CERT_DIR"
+    chmod 755 "$CERT_DIR"
+    print_success "证书目录已创建并设置好权限。"
+
+    # 安装证书到 Nginx 指定目录
+    print_info "正在安装证书到 $CERT_DIR"
+    ~/.acme.sh/acme.sh --install-cert -d "$DOMAIN" \
+        --key-file "$CERT_DIR/$DOMAIN.key" \
+        --fullchain-file "$CERT_DIR/$DOMAIN.pem" \
+        --reloadcmd "systemctl reload nginx"
+
+    if [ $? -ne 0 ]; then
+        print_error "证书安装失败，请手动检查 Nginx 目录权限或配置。"
+        exit 1
+    fi
+    print_success "证书已成功安装！"
+
+    # 查看已安装证书信息
+    print_info "正在查看已安装证书信息..."
+    acme.sh --info -d "$DOMAIN"
+
+    # 自动升级 acme.sh
+    print_info "正在设置 acme.sh 自动升级..."
+    acme.sh --upgrade --auto-upgrade
+    
+    show_completion_info
+}
+
+# 调用主函数
+main
