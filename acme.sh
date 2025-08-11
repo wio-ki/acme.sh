@@ -2,7 +2,7 @@
 # ===============================================
 # 脚本名称：acme_cert_setup.sh
 # 脚本功能：使用 acme.sh 自动化申请 SSL 证书
-# 版本：3.0
+# 版本：3.1
 # 支持：Cloudflare DNS 验证
 # ===============================================
 
@@ -51,34 +51,51 @@ check_nginx() {
 
 # 获取用户输入
 get_user_input() {
-    echo -e "${YELLOW}请提供以下信息以开始证书申请：${NC}"
-    read -p "请输入您的域名 (例如: example.com): " DOMAIN
-    if [ -z "$DOMAIN" ]; then
-        print_error "域名不能为空！"
-        exit 1
-    fi
+    while true; do
+        echo -e "${YELLOW}请提供以下信息以开始证书申请：${NC}"
+        read -p "请输入您的域名 (例如: example.com): " DOMAIN
+        if [ -z "$DOMAIN" ]; then
+            print_error "域名不能为空！"
+            continue
+        fi
 
-    read -p "请输入您的 Cloudflare 注册邮箱: " EMAIL
-    if [ -z "$EMAIL" ]; then
-        print_error "Cloudflare 邮箱不能为空！"
-        exit 1
-    fi
+        read -p "请输入您的 Cloudflare 注册邮箱: " EMAIL
+        if [ -z "$EMAIL" ]; then
+            print_error "Cloudflare 邮箱不能为空！"
+            continue
+        fi
 
-    read -p "请输入您的 Cloudflare API Token: " CF_Token
-    if [ -z "$CF_Token" ]; then
-        print_error "Cloudflare API Token 不能为空！"
-        exit 1
-    fi
+        read -p "请输入您的 Cloudflare API Token: " CF_Token
+        if [ -z "$CF_Token" ]; then
+            print_error "Cloudflare API Token 不能为空！"
+            continue
+        fi
 
-    read -p "请输入您的 Cloudflare Account ID: " CF_Account_ID
-    if [ -z "$CF_Account_ID" ]; then
-        print_error "Cloudflare Account ID 不能为空！"
-        exit 1
-    fi
+        read -p "请输入您的 Cloudflare Account ID: " CF_Account_ID
+        if [ -z "$CF_Account_ID" ]; then
+            print_error "Cloudflare Account ID 不能为空！"
+            continue
+        fi
+        echo ""
+
+        echo -e "${YELLOW}请确认以下信息是否正确：${NC}"
+        print_info "域名: $DOMAIN"
+        print_info "邮箱: $EMAIL"
+        print_info "API Token: $CF_Token"
+        print_info "Account ID: $CF_Account_ID"
+        echo ""
+        read -p "信息是否正确？ (y/n): " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            break
+        else
+            echo -e "${YELLOW}请重新输入。${NC}"
+            echo ""
+        fi
+    done
     echo ""
 }
 
-# 显示完成信息 (已精简)
+# 显示完成信息
 show_completion_info() {
     print_success "证书文件位置："
     echo "  • 私钥文件: /etc/nginx/ssl/$DOMAIN.key"
