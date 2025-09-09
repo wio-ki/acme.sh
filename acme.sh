@@ -128,12 +128,21 @@ main() {
     export CF_Token="$CF_Token"
     export CF_Account_ID="$CF_Account_ID"
     
-    # 申请证书
+        # 申请证书
     print_info "正在为域名 $DOMAIN 申请 SSL 证书..."
+    
+    # 先切换到 Let's Encrypt
+    /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+    
     ~/.acme.sh/acme.sh --issue --dns dns_cf -d "$DOMAIN"
     if [ $? -ne 0 ]; then
-        print_error "证书申请失败，请检查您的 Cloudflare 配置。"
-        exit 1
+        print_warning "使用 Let's Encrypt 申请失败，尝试切换至 ZeroSSL..."
+        /root/.acme.sh/acme.sh --set-default-ca --server zerossl
+        ~/.acme.sh/acme.sh --issue --dns dns_cf -d "$DOMAIN"
+        if [ $? -ne 0 ]; then
+            print_error "证书申请失败，请检查您的 Cloudflare 配置或稍后再试。"
+            exit 1
+        fi
     fi
     print_success "证书申请成功！"
 
